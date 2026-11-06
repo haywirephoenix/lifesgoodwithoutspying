@@ -423,7 +423,7 @@ apply_voice() {
     fi
     if voice_mic_kept && has_unit_manager; then
         unit_ctl start voiceinput.service
-        echo "[~] voice.keep_mic: voiceinput left running"
+        echo "[~] voice.keep_mic: voiceinput not stubbed"
     fi
 }
 

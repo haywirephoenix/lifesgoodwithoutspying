@@ -93,7 +93,7 @@ selftest_answering() {
         elif answer_running "$service"; then
             echo "  ${service##*.} stand-in: answering"
         elif [ "$service" = com.webos.service.voiceinput ] && voice_mic_kept; then
-            echo "  voiceinput: LG's service left running (voice.keep_mic)"
+            echo "  voiceinput: not stubbed (voice.keep_mic), running: $(pidof voiceinput >/dev/null && echo yes || echo no)"
         else
             echo "  ${service##*.} stand-in: stopped"
         fi

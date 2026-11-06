@@ -199,6 +199,23 @@ rm -f /var/lib/webosbrew/init.d/50-lifesgoodwithoutspying
   three of those service names and answers the calls they need, without reading
   any ID or touching audio; the self-test reports whether each one is running.
   It needs `node` on the TV.
+- **Keep microphone service** (`voice.keep_mic`, off by default) narrows the
+  Voice toggle: `voiceinput` is not stubbed, while `voiceconductor`,
+  `nlpmanager`, `performer`, `voiceclick`, the `voiceinput_*` helpers and the
+  voice app stay stubbed. It does nothing while Voice is off. This is weaker
+  than Voice alone, which leaves nothing able to capture. Checked on webOS 5.4
+  only: `voiceinput` has no outbound network calls of its own and held no
+  network sockets during a remote microphone stream. It passes audio to a local
+  socket for whichever system service asks, so this relies on nothing that sends
+  audio to LG being left running. It can also ask LG's `sdx` service about
+  updates, which `domains.sdp` blocks. `voiceinput` is not started on demand, so
+  anything else that stops it leaves the microphone off until the next apply.
+- **Claiming a stand-in.** An app that really answers for a stubbed service can
+  ask our stand-in to step aside: it writes its pid to
+  `/tmp/lifesgoodwithoutspying.claim.<service>` and then kills the pid in
+  `/tmp/lifesgoodwithoutspying.answer.<service>.pid`. The stand-in returns once
+  that pid is gone. The real executable stays stubbed, so a claim can't bring
+  LG's service back.
 - **The domain sink is host-based.** The self-test's `getent` and `curl`
   checks only prove that the generated `/etc/hosts` is visible to commands
   using the local resolver. Some webOS services use their own DNS path,
