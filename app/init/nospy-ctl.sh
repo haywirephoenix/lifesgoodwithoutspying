@@ -88,8 +88,12 @@ selftest_processes() {
 # One selftest line per service that has a stand-in.
 selftest_answering() {
     for service in $ANSWERED_SERVICES; do
-        if answer_running "$service"; then
+        if answer_claimed "$service"; then
+            echo "  ${service##*.} stand-in: stepped aside for pid $c_pid"
+        elif answer_running "$service"; then
             echo "  ${service##*.} stand-in: answering"
+        elif [ "$service" = com.webos.service.voiceinput ] && voice_mic_kept; then
+            echo "  voiceinput: LG's service left running (voice.keep_mic)"
         else
             echo "  ${service##*.} stand-in: stopped"
         fi

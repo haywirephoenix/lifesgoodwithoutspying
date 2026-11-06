@@ -30,6 +30,7 @@ conf_default() {
         dns.filter)         echo off ;;
         dns.disable_ipv6)   echo off ;;
         voice.stop)         echo on ;;
+        voice.keep_mic)     echo off ;;
         ads.stop)           echo on ;;
         lan.block)          echo off ;;
         purge.boot)         echo on ;;
@@ -108,7 +109,8 @@ conf_keys() {
     printf '%s\n' \
         domains.acr domains.smartad domains.quickset domains.dashboard domains.lgrecommends \
         domains.telemetry domains.sdp clock.ntp domains.lgchannels domains.updates \
-        domains.thinq domains.wiselg dns.filter dns.disable_ipv6 voice.stop ads.stop lan.block purge.boot
+        domains.thinq domains.wiselg dns.filter dns.disable_ipv6 voice.stop voice.keep_mic ads.stop lan.block \
+        purge.boot
 }
 
 # Newline-separated list of domain category keys.
@@ -336,10 +338,18 @@ has_unit_manager() {
 
 # The executables each service toggle stops, by name. The names are also what
 # status reports, one proc.<group>.<name> line each.
-VOICE_NAMES="voiceinput voiceinput_network voiceinput_preprocessor voiceinput_hidraw voiceinput_sound voiceconductor voiceclick nlpmanager performer"
+VOICE_NAMES="voiceinput_network voiceinput_preprocessor voiceinput_hidraw voiceinput_sound voiceconductor voiceclick nlpmanager performer"
 ADS_NAMES="admanager livepick acr2 nudge rdxd uploadd sportsalarm adoverlay-service"
 THINQ_NAMES="trigger_thinq trigger_alexa iot-proxy iot-client mqtt-client lg.thinqai.adapter amazon-alexa-adapter amazon-alexa-vsk"
 SERVICE_GROUPS="voice ads thinq lan"
+
+# Exit 0 if voiceinput stays up for an on-TV recogniser such as Local Voice while
+# the rest of the voice group is stopped. voice.keep_mic only narrows voice.stop.
+# Only voiceinput is kept: a TV that splits capture into voiceinput_* helpers
+# loses the microphone rather than keeping more running than was checked.
+voice_mic_kept() {
+    is_on voice.stop && is_on voice.keep_mic
+}
 
 # "<name> <path>" for every executable one group targets. Each name gets the
 # canonical directories plus any per-app jail copy: jails hardlink the /usr/sbin
@@ -348,7 +358,10 @@ SERVICE_GROUPS="voice ads thinq lan"
 # stub_mount's -f test. Launchers and copies outside those directories follow.
 group_targets() {
     case "$1" in
-        voice) names="$VOICE_NAMES" ;;
+        voice)
+            names="$VOICE_NAMES"
+            voice_mic_kept || names="voiceinput $names"
+            ;;
         ads) names="$ADS_NAMES" ;;
         thinq) names="$THINQ_NAMES" ;;
         # apply_lan stubs only the host binary, with its own script.
@@ -387,7 +400,8 @@ voice_execs() {
 }
 
 voice_units() {
-    printf '%s\n' voiceinput.service voiceconductor.service
+    voice_mic_kept || echo voiceinput.service
+    echo voiceconductor.service
 }
 
 # Apps to ask the application manager to close. They run inside WebAppMgr, so
@@ -520,6 +534,12 @@ ANSWERED_SERVICES="com.webos.service.admanager com.webos.service.voiceconductor 
 # Token of the current worker for a service, as "<prefix>.<service>"; removing it
 # stops the worker. Companion .pid and .err files sit beside it.
 ANSWER_PREFIX="/tmp/lifesgoodwithoutspying.answer"
+# A service whose name another app answers for, as "<prefix>.<service>", holding
+# that app's pid. Our stand-in steps aside while the pid lives and comes back by
+# itself after. The real executable stays stubbed either way, so a claim can only
+# replace the stand-in, never bring LG's service back. To claim: write the file,
+# then kill the pid in the "<ANSWER_PREFIX>.<service>.pid" file.
+ANSWER_CLAIM_PREFIX="/tmp/lifesgoodwithoutspying.claim"
 # A run this long counts as working, and clears the count of failed runs.
 ANSWER_HEALTHY_SECONDS=60
 ANSWER_MAX_FAILURES=20
@@ -537,6 +557,15 @@ answered_in() {
         answer_exec_listed "$a_service" "$1" && echo "$a_service"
     done
     return 0
+}
+
+# Exit 0 if a live process has claimed service $1, leaving its pid in c_pid.
+answer_claimed() {
+    [ -f "$ANSWER_CLAIM_PREFIX.$1" ] && read -r c_pid < "$ANSWER_CLAIM_PREFIX.$1" || return 1
+    case "$c_pid" in
+        ''|*[!0-9]*) return 1 ;;
+    esac
+    [ -d "/proc/$c_pid" ]
 }
 
 # Exit 0 if the stub for service $1 is running, leaving its pid in a_pid. A pid
@@ -574,6 +603,11 @@ answer_start() {
                 echo "[-] gave up answering for $a_name: $(tail -n 1 "$a_file.err" 2>/dev/null)"
                 exit 0
             fi
+            if answer_claimed "$a_service"; then
+                a_failures=0
+                sleep "$ANSWER_RETRY_SECONDS"
+                continue
+            fi
             a_started="$(uptime_seconds)"
             NODE_PATH=/usr/lib/nodejs node "$DIR/nospy-luna-stub.js" "$a_service" \
                 </dev/null >/dev/null 2>"$a_file.err" &
@@ -586,8 +620,16 @@ answer_start() {
                 kill -KILL "$a_pid" 2>/dev/null
                 exit 0
             fi
+            # Likewise for a claim: the claimant writes it and then reads the pid.
+            if answer_claimed "$a_service"; then
+                kill -KILL "$a_pid" 2>/dev/null
+                wait "$a_pid" 2>/dev/null
+                continue
+            fi
             wait "$a_pid"
-            if [ "$(($(uptime_seconds) - a_started))" -ge "$ANSWER_HEALTHY_SECONDS" ]; then
+            # A claim that ended this run is not a failure.
+            if answer_claimed "$a_service" ||
+                [ "$(($(uptime_seconds) - a_started))" -ge "$ANSWER_HEALTHY_SECONDS" ]; then
                 a_failures=0
             else
                 a_failures=$((a_failures + 1))

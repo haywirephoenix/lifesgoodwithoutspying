@@ -33,6 +33,9 @@ TVs: ad delivery, Automatic Content Recognition, and always-on voice capture.
   microphone hardware or guarantee that other software cannot access audio;
   target availability and results vary by model and firmware. The remote voice
   key may stop working.
+- Optionally leaves `voiceinput` running while the rest of the voice group stays
+  stopped, for speech recognition that runs on the TV, such as
+  [Local Voice](https://github.com/haywirephoenix/webos-localvoice).
 - Bind-mounts an inert stub over each target binary, so the Luna hub cannot
   respawn it (no polling loop).
 - Answers calls to `admanager`, `voiceconductor` and `voiceinput` with a small

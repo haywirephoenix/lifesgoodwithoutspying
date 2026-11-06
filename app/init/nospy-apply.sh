@@ -406,8 +406,13 @@ apply_ads() {
     apply_stub_category ads.stop ads_units ads_execs
 }
 
-# Voice services, and the voice app if it is already up.
+# Voice services, and the voice app if it is already up. With voice.keep_mic
+# voiceinput is outside the category, so its stand-in has to go here, and a unit
+# an earlier apply stopped has to come back here.
 apply_voice() {
+    if voice_mic_kept; then
+        answer_stop com.webos.service.voiceinput
+    fi
     apply_stub_category voice.stop voice_units voice_execs
     if is_on voice.stop; then
         voice_apps > "$APPS_TMP"
@@ -415,6 +420,10 @@ apply_voice() {
             [ -n "$id" ] || continue
             app_close "$id"
         done < "$APPS_TMP"
+    fi
+    if voice_mic_kept && has_unit_manager; then
+        unit_ctl start voiceinput.service
+        echo "[~] voice.keep_mic: voiceinput left running"
     fi
 }
 
