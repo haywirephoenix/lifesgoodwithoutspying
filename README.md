@@ -33,9 +33,10 @@ TVs: ad delivery, Automatic Content Recognition, and always-on voice capture.
   microphone hardware or guarantee that other software cannot access audio;
   target availability and results vary by model and firmware. The remote voice
   key may stop working.
-- Optionally leaves `voiceinput` running while the rest of the voice group stays
-  stopped, for speech recognition that runs on the TV, such as
-  [Local Voice](https://github.com/haywirephoenix/webos-localvoice).
+- Leaves `voiceinput` running while the rest of the voice group stays stopped,
+  for as long as an installed app that runs speech recognition on the TV, such
+  as [Local Voice](https://github.com/haywirephoenix/webos-localvoice), has
+  registered for it. Status names that app.
 - Bind-mounts an inert stub over each target binary, so the Luna hub cannot
   respawn it (no polling loop).
 - Answers calls to `admanager`, `voiceconductor` and `voiceinput` with a small
@@ -199,17 +200,27 @@ rm -f /var/lib/webosbrew/init.d/50-lifesgoodwithoutspying
   three of those service names and answers the calls they need, without reading
   any ID or touching audio; the self-test reports whether each one is running.
   It needs `node` on the TV.
-- **Keep microphone service** (`voice.keep_mic`, off by default) narrows the
-  Voice toggle: `voiceinput` is not stubbed, while `voiceconductor`,
-  `nlpmanager`, `performer`, `voiceclick`, the `voiceinput_*` helpers and the
-  voice app stay stubbed. It does nothing while Voice is off. This is weaker
-  than Voice alone, which leaves nothing able to capture. Checked on webOS 5.4
-  only: `voiceinput` has no outbound network calls of its own and held no
-  network sockets during a remote microphone stream. It passes audio to a local
-  socket for whichever system service asks, so this relies on nothing that sends
-  audio to LG being left running. It can also ask LG's `sdx` service about
-  updates, which `domains.sdp` blocks. `voiceinput` is not started on demand, so
-  anything else that stops it leaves the microphone off until the next apply.
+- **Apps that keep `voiceinput`.** An app that runs speech recognition on the
+  TV needs `voiceinput`, which captures the remote's microphone. It registers by
+  writing a file named after its app id to
+  `/var/lib/webosbrew/lifesgoodwithoutspying.keep.d/`, holding the line
+  `voiceinput`, and then runs `nospy-ctl.sh apply`. It removes the file and
+  applies again when it no longer needs the microphone, for example when it is
+  turned off. While Voice is on and a registered app is installed, `voiceinput`
+  is not stubbed; `voiceconductor`, `nlpmanager`, `performer`, `voiceclick`, the
+  `voiceinput_*` helpers and the voice app stay stubbed. Status and the
+  self-test name each app, the verdict stays Protected, and a `voiceinput` left
+  running for an app that has gone is reported as running. Only `voiceinput`
+  can be kept, and Voice alone, with nothing registered, still leaves nothing
+  able to capture. Checked on webOS 5.4 only: `voiceinput` has no outbound
+  network calls of its own and held no network sockets during a remote
+  microphone stream. It passes audio to a local socket for whichever system
+  service asks, so this relies on nothing that sends audio to LG being left
+  running. It can also ask LG's `sdx` service about updates, which
+  `domains.sdp` blocks. `voiceinput` is not started on demand, so anything else
+  that stops it leaves the microphone off until the next apply. Every homebrew
+  app runs as root, so this can't stop an app that ignores it; it makes a
+  well-behaved one visible.
 - **Claiming a stand-in.** An app that really answers for a stubbed service can
   ask our stand-in to step aside: it writes its pid to
   `/tmp/lifesgoodwithoutspying.claim.<service>` and then kills the pid in

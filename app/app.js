@@ -151,7 +151,7 @@
     function fact(f) {
         var span = make('span');
         span.appendChild(make('i', 'dot ok'));
-        var parts = t(f.key).split('{n}');
+        var parts = t(f.key, f.params).split('{n}');
         span.appendChild(document.createTextNode(parts[0]));
         if (parts.length > 1) {
             span.appendChild(make('b', '', String(f.n)));

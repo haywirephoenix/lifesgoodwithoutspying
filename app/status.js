@@ -17,9 +17,10 @@ window.nospyStatus = (function () {
     //   saved.<key>=on|off     saved settings, which the toggles show
     //   applied.<key>=on|off   the settings the last apply used
     //   proc.<group>.<name>=running|stopped|absent|unknown
+    //   kept.<group>.<name>=<titles>   left running for the apps registered for it
     function read(map) {
         var enabled = map.autostart === 'on';
-        var saved = {}, applied = {}, groups = [], byId = {};
+        var saved = {}, applied = {}, groups = [], byId = {}, kept = {};
         Object.keys(map).forEach(function (k) {
             var v = map[k], m;
             if ((m = /^saved\.(.+)$/.exec(k))) {
@@ -27,6 +28,9 @@ window.nospyStatus = (function () {
             }
             else if ((m = /^applied\.(.+)$/.exec(k))) {
                 applied[m[1]] = v === 'on';
+            }
+            else if ((m = /^kept\.([^.]+)\.(.+)$/.exec(k))) {
+                (kept[m[1]] = kept[m[1]] || []).push({ name: m[2], apps: v });
             }
             else if ((m = /^proc\.([^.]+)\.(.+)$/.exec(k))) {
                 // Names can contain dots; groups can't.
@@ -58,6 +62,7 @@ window.nospyStatus = (function () {
             g.saved = g.key ? !!saved[g.key] : true;
             g.live = g.key ? !!live[g.key] : true;
             g.dirty = g.key ? !!dirty[g.key] : false;
+            g.kept = g.live ? kept[g.id] || [] : [];
             g.running = [];
             g.unknown = [];
             g.procs.forEach(function (p) {
@@ -141,6 +146,11 @@ window.nospyStatus = (function () {
             list.push({ key: 'facts.dns' });
         if (model.stopped)
             list.push({ key: 'facts.processes', n: model.stopped });
+        model.groups.forEach(function (g) {
+            (g.kept || []).forEach(function (k) {
+                list.push({ key: 'facts.kept', n: k.name, params: { apps: k.apps } });
+            });
+        });
         return list;
     }
 
@@ -179,6 +189,12 @@ window.nospyStatus = (function () {
             return { cls: 'c-bad', key: 'state.running', params: { names: group.running } };
         if (group.unknown.length)
             return { cls: 'c-warn', key: 'state.unknown' };
+        // A process an app registered to keep (keepers in nospy-lib.sh).
+        if (group.kept && group.kept.length) {
+            return { key: 'state.stoppedKept', params: {
+                kept: group.kept.map(function (k) { return k.name; }).join(', '),
+                apps: group.kept.map(function (k) { return k.apps; }).join(', ') } };
+        }
         return { key: 'state.stopped' };
     }
 

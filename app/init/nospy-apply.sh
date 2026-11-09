@@ -406,9 +406,10 @@ apply_ads() {
     apply_stub_category ads.stop ads_units ads_execs
 }
 
-# Voice services, and the voice app if it is already up. With voice.keep_mic
-# voiceinput is outside the category, so its stand-in has to go here, and a unit
-# an earlier apply stopped has to come back here.
+# Voice services, and the voice app if it is already up. While an app keeps
+# voiceinput (keepers in nospy-lib.sh) it is outside the category, so its
+# stand-in has to go here, and a unit an earlier apply stopped has to come back
+# here.
 apply_voice() {
     if voice_mic_kept; then
         answer_stop com.webos.service.voiceinput
@@ -423,7 +424,7 @@ apply_voice() {
     fi
     if voice_mic_kept && has_unit_manager; then
         unit_ctl start voiceinput.service
-        echo "[~] voice.keep_mic: voiceinput not stubbed"
+        echo "[~] voiceinput not stubbed, kept for $(keeper_titles voiceinput)"
     fi
 }
 
