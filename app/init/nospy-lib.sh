@@ -33,6 +33,7 @@ conf_default() {
         ads.stop)           echo on ;;
         lan.block)          echo off ;;
         purge.boot)         echo on ;;
+        keep.apps)          echo off ;;
         *)                  echo off ;;
     esac
 }
@@ -108,7 +109,8 @@ conf_keys() {
     printf '%s\n' \
         domains.acr domains.smartad domains.quickset domains.dashboard domains.lgrecommends \
         domains.telemetry domains.sdp clock.ntp domains.lgchannels domains.updates \
-        domains.thinq domains.wiselg dns.filter dns.disable_ipv6 voice.stop ads.stop lan.block purge.boot
+        domains.thinq domains.wiselg dns.filter dns.disable_ipv6 voice.stop ads.stop lan.block purge.boot \
+        keep.apps
 }
 
 # Newline-separated list of domain category keys.
@@ -346,7 +348,8 @@ SERVICE_GROUPS="voice ads thinq lan"
 # the names it keeps, one a line; it removes the file when it no longer needs
 # them, and runs apply after either change. Only names in KEEPABLE count, and
 # only while that app is installed, so a stale file or an uninstalled app
-# changes nothing. Status names each app, and a kept process that is no longer
+# changes nothing. Nothing is kept unless the user turns on keep.apps (App
+# exceptions in Services), which is off by default. Status names each app, and a kept process that is no longer
 # registered is reported as running.
 KEEP_DIR="/var/lib/webosbrew/lifesgoodwithoutspying.keep.d"
 KEEP_APP_DIRS="/media/developer/apps/usr/palm/applications /usr/palm/applications"
@@ -356,8 +359,10 @@ KEEP_APP_DIRS="/media/developer/apps/usr/palm/applications /usr/palm/application
 # running than was checked.
 KEEPABLE="voiceinput"
 
-# The installed apps keeping process $1, one id a line.
+# The installed apps keeping process $1, one id a line, while App exceptions
+# is on.
 keepers() {
+    is_on keep.apps || return 0
     case " $KEEPABLE " in
         *" $1 "*) ;;
         *) return 0 ;;

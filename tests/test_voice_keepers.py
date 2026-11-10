@@ -1,5 +1,6 @@
-"""Apps that keep voiceinput: what stays stubbed, who counts as a keeper, and
-that a stand-in only steps aside for a live claim."""
+"""Apps that keep voiceinput: what stays stubbed, who counts as a keeper, that
+nothing is kept unless App exceptions is on, and that a stand-in only steps
+aside for a live claim."""
 import os
 from pathlib import Path
 import subprocess
@@ -13,9 +14,11 @@ SHELL = os.environ.get("TEST_SHELL", "sh")
 STAYS_STUBBED = ["voiceconductor", "voiceclick", "nlpmanager", "performer", "voiceinput_network",
                  "voiceinput_preprocessor", "voiceinput_hidraw", "voiceinput_sound", "com.webos.app.voice"]
 APP = "com.example.recogniser"
+# App exceptions (keep.apps) is off by default; most tests turn it on.
+ALLOW = "keep.apps=on\n"
 
 
-def sh(script, conf="", keep=None, installed=(APP,), **env):
+def sh(script, conf=ALLOW, keep=None, installed=(APP,), **env):
     """Run script after sourcing the library, with keep {app id: file text}
     registered and the apps in installed present."""
     with tempfile.TemporaryDirectory() as tmp:
@@ -36,7 +39,7 @@ def sh(script, conf="", keep=None, installed=(APP,), **env):
     return out
 
 
-def names(conf="", keep=None, **kw):
+def names(conf=ALLOW, keep=None, **kw):
     out = sh("voice_execs", conf, keep, **kw).stdout.split()
     return {path.rsplit("/", 1)[1] for path in out}
 
@@ -78,8 +81,20 @@ class KeepersTest(unittest.TestCase):
             self.assertEqual(sh("keepers voiceinput", keep={bad: "voiceinput\n"}, installed=(bad,)).stdout, "", bad)
 
     def test_does_nothing_while_voice_is_off(self):
-        conf = "voice.stop=off\n"
+        conf = "voice.stop=off\n" + ALLOW
         self.assertNotEqual(sh("voice_mic_kept", conf, KEPT).returncode, 0)
+
+    def test_app_exceptions_is_a_setting_and_off_by_default(self):
+        self.assertIn("keep.apps", sh("conf_keys").stdout.split())
+        self.assertEqual(sh("conf_get keep.apps", conf="").stdout.strip(), "off")
+
+    def test_nothing_is_kept_while_app_exceptions_is_off(self):
+        for conf in ("", "keep.apps=off\n"):
+            self.assertIn("voiceinput", names(conf, KEPT), conf)
+            self.assertEqual(sh("keepers voiceinput", conf, KEPT).stdout, "", conf)
+            self.assertNotEqual(sh("voice_mic_kept", conf, KEPT).returncode, 0, conf)
+            self.assertEqual(sh("voice_units", conf, KEPT).stdout.split(),
+                             ["voiceinput.service", "voiceconductor.service"], conf)
 
     def test_the_old_setting_is_gone(self):
         self.assertNotIn("voice.keep_mic", sh("conf_keys").stdout.split())

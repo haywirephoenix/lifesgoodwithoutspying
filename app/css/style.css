@@ -225,6 +225,8 @@ code {
 .pip.unknown { background: linear-gradient(90deg, #DFA63C 50%, transparent 50%); box-shadow: inset 0 0 0 0.14vh #DFA63C; }
 .pip.idle { background: #3B474B; }
 .pip.kept { background: #5AA9E6; }
+/* App exceptions shows the blue dot it adds, in its description. */
+.exceptions small .pip { display: inline-block; margin: 0 0.4vw 0 0; vertical-align: middle; }
 
 .cells > span {
   width: calc(16.666% - 0.26vw);

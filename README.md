@@ -207,6 +207,9 @@ rm -f /var/lib/webosbrew/init.d/50-lifesgoodwithoutspying
 - **Apps that keep `voiceinput`.** An app that needs the microphone can keep
   `voiceinput` running while the rest of the voice group (`voiceconductor`,
   `nlpmanager`, etc.) stays stubbed.
+  - Only while **App exceptions** is on in Services. It's off by default, so
+    nothing is kept until you turn it on. A kept service shows as a blue dot
+    under its group, named with the app keeping it.
   - To register: write a file named `<app_id>` containing `voiceinput` to
     `/var/lib/webosbrew/lifesgoodwithoutspying.keep.d/`, then run
     `nospy-ctl.sh apply`. It only counts while that app is installed.
