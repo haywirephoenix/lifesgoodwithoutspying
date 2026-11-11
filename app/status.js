@@ -18,12 +18,20 @@ window.nospyStatus = (function () {
     //   applied.<key>=on|off   the settings the last apply used
     //   proc.<group>.<name>=running|stopped|absent|unknown
     //   kept.<group>.<name>=<titles>   left running for the apps registered for it
+    //   exception_app.<key>=<title>    the app behind exception setting <key>
+    //   exception_in_use.<key>=yes     that exception is in effect now
     function read(map) {
         var enabled = map.autostart === 'on';
-        var saved = {}, applied = {}, groups = [], byId = {}, kept = {};
+        var saved = {}, applied = {}, groups = [], byId = {}, kept = {}, titles = {}, inUse = {};
         Object.keys(map).forEach(function (k) {
             var v = map[k], m;
-            if ((m = /^saved\.(.+)$/.exec(k))) {
+            if ((m = /^exception_app\.(.+)$/.exec(k))) {
+                titles[m[1]] = v;
+            }
+            else if ((m = /^exception_in_use\.(.+)$/.exec(k))) {
+                inUse[m[1]] = v === 'yes';
+            }
+            else if ((m = /^saved\.(.+)$/.exec(k))) {
                 saved[m[1]] = v === 'on';
             }
             else if ((m = /^applied\.(.+)$/.exec(k))) {
@@ -48,6 +56,14 @@ window.nospyStatus = (function () {
         Object.keys(kept).forEach(function (id) {
             if (byId[id])
                 kept[id].forEach(function (k) { byId[id].procs.push({ name: k.name, state: 'kept', apps: k.apps }); });
+        });
+        // Each exception an app registered is a setting of its own,
+        // exception.<app id>:<keep|claim>:<name>, in the order status lists them.
+        var exceptions = [];
+        Object.keys(saved).forEach(function (k) {
+            var m = /^exception\.([^:]+):(keep|claim):(.+)$/.exec(k);
+            if (m)
+                exceptions.push({ key: k, app: m[1], title: titles[k] || m[1], kind: m[2], name: m[3], inUse: !!inUse[k] });
         });
         // Before the first apply there are no applied lines, and nothing is
         // running yet to differ from the saved settings.
@@ -95,6 +111,7 @@ window.nospyStatus = (function () {
             blocklist: map.blocklist || '0',
             hostsWait: map.hosts_wait === undefined ? null : parseInt(map.hosts_wait, 10),
             groups: groups,
+            exceptions: exceptions,
             running: running,
             unknown: unknown,
             stopped: stopped,
