@@ -375,7 +375,7 @@ KEEPABLE="voiceinput"
 # "<app id> <keep|claim> <name>" for each exception an installed app registered.
 # After exception_load, the list read then.
 exception_entries() {
-    if [ -n "$EXCEPT_LOADED" ]; then
+    if [ -n "${EXCEPT_LOADED:-}" ]; then
         [ -z "$EXCEPT_ENTRIES" ] || printf '%s\n' "$EXCEPT_ENTRIES"
         return 0
     fi
@@ -464,7 +464,7 @@ keeper_titles() {
 # rest of the voice group is stopped. Only matters while Voice is on, as last
 # applied.
 voice_mic_kept() {
-    case "$EXCEPT_MIC_KEPT" in
+    case "${EXCEPT_MIC_KEPT:-}" in
         yes) return 0 ;;
         no) return 1 ;;
     esac
